@@ -245,8 +245,19 @@ export function useContext(context) {
 }
 ```
 ![](./assets/fiber-hooks.png)
-react根据函数内hook的调用顺序，创建一个记录hooks的链表数据结构，里面保存了各个hook的状态。然后这个数据存放在fiber节点的memorizedState属性上。
+
+react根据hooks的执行顺序，创建一个记录hooks的单向链表，存放在fiber节点的memorizedState属性上。
+在链表中每个hook都对应一个hook对象。对象里面主要有3个属性：
+- memoizedState：当前状态（更新时表示上一次的状态）
+- queue：待执行的更新队列(queue.pending)
+- next：下一个 hook
+
+
+在update阶段，会根据链表的顺序，依次执行每个hook的更新逻辑。
+
+---
+
 
 根据hook的执行顺序，就能根据链表拿到对应的值。因此为了保持hooks顺序的一致性，我们禁止把hooks放在各种条件语句中运行，因为可能导致hooks的顺序错乱。  
 
-2)useEffect在react18的严格模式下会执行2次（完成了2次组件安装，也就是有组件卸载的过程），是因为后续react新增的功能做好准备（允许 React 在保留状态的同时，能够做到仅仅对UI部分的添加和删除）
+useEffect在react18的严格模式下会执行2次（完成了2次组件安装，也就是有组件卸载的过程），是因为后续react新增的功能做好准备（允许 React 在保留状态的同时，能够做到仅仅对UI部分的添加和删除）
