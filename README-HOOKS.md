@@ -246,14 +246,17 @@ export function useContext(context) {
 ```
 ![](./assets/fiber-hooks.png)
 
+**在mount**
 react根据hooks的执行顺序，创建一个记录hooks的单向链表，存放在fiber节点的memorizedState属性上。
 在链表中每个hook都对应一个hook对象。对象里面主要有3个属性：
 - memoizedState：当前状态（更新时表示上一次的状态）
-- queue：待执行的更新队列(queue.pending)
+- queue：待执行的更新队列(queue.pending)，这是一个单向循环链表，每个节点都是一个update对象。
 - next：下一个 hook
 
 
-在update阶段，会根据链表的顺序，依次执行每个hook的更新逻辑。
+**在update阶段**
+- 会根据链表的顺序，依次执行每个hook的update函数，更新hook的memoizedState属性。
+- queue存储的是待执行的更新队列，每次执行完update函数后，会把queue.pending置为null，表示已经执行完了。
 
 ---
 

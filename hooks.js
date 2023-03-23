@@ -3,6 +3,7 @@ let isMount = true;
 
 const fiber = {
   memoizedState: null,
+  // stateNode表示组件实例，这里是App函数
   stateNode: App
 };
 
