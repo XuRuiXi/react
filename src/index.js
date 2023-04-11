@@ -1,39 +1,25 @@
+/* eslint-disable react/no-deprecated */
+
+
 // import React, { useState } from 'react';
 // import ReactDOM from 'react-dom';
 
-import React, { useState } from '../react/react.js';
-import ReactDOM from '../react/react-dom';
-import Child from './components/Child.js';
+// import React, { useState } from '../react/react.js';
+// import ReactDOM from '../react/react-dom';
 
+import React from '../toy-react';
 
-export let StateDate = React.createContext();
-
-
-const Child2 = () => {
+const App = () => {
+  const [count, setCount] = React.useState(1);
+  const [count2, setCount2] = React.useState(2);
   return (
     <div>
-      <StateDate.Consumer>
-        {num => <h1>{num}</h1>}
-      </StateDate.Consumer>
+      <h1>hello {count}</h1>
+      <button onClick={() => setCount(count + 1)}>add</button>
+      <h1>hello {count2}</h1>
+      <button onClick={() => setCount2(count2 + 1)}>add</button>
     </div>
   );
 };
 
-function App() {
-  let [num, setNum] = useState(0);
-  //根组件提供数据
-  return (
-    <div>
-      <h1 onClick={() => setNum(num++)}>父亲</h1>
-      <StateDate.Provider value={num}>
-        <Child></Child>
-      </StateDate.Provider>
-      <Child2></Child2>
-    </div>
-
-
-  );
-}
-
-
-ReactDOM.render(<App />, document.getElementById('app'));
+React.render(<App />, document.getElementById('app'));

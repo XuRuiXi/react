@@ -14,11 +14,15 @@ module.exports = {
       '@': path.resolve(__dirname, '../src'),
     },
   },
+  // 解决模块导入路径
+  resolveLoader: {
+    modules: ['node_modules', path.resolve(__dirname, '../loaders')]
+  },
   module: {
     rules: [
       {
         test: /\.js$/,
-        loader: 'babel-loader',
+        use: ['babel-loader'],
         exclude: /node_modules/, // 不处理的文件夹
       },
       {

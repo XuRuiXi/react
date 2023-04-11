@@ -67,6 +67,9 @@
     ">0.01%"
   ],
   "dependencies": {
+    "@babel/generator": "^7.21.3",
+    "@babel/parser": "^7.21.3",
+    "@babel/traverse": "^7.21.3",
     "@types/react-dom": "17",
     "react-dom": "17"
   }
