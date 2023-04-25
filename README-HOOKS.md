@@ -246,6 +246,7 @@ export function useContext(context) {
 ```
 ![](./assets/fiber-hooks.png)
 
+
 **在mount**
 react根据hooks的执行顺序，创建一个记录hooks的单向链表，存放在fiber节点的memorizedState属性上。
 在链表中每个hook都对应一个hook对象。对象里面主要有3个属性：
