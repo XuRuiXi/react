@@ -23,7 +23,7 @@ sibling: 指向下一个兄弟Fiber节点
 pendingProps: 当前最新的props
 memoizedProps: 上一次的props
 memoizedState: 上一次的state
-updateQueue: 用于保存更新队列
+updateQueue: 用于保存更新队列（ClassComponent与HostRoot）
 effectTag: 副作用标识：'UPDATE'、'PLACEMENT'、'DELETION'...
 lanes: 调度优先级相关
 ```
@@ -75,7 +75,7 @@ workInProgressFiber.alternate === currentFiber;
 ### 各个阶段的工作
 
 
-**<span style="color:red">render 阶段</span>**
+**<span style="color:red">render 阶段(Reconciler)</span>**
 
 render 阶段开始于 performSyncWorkOnRoot 或 performConcurrentWorkOnRoot 方法的调用。这取决于本次更新是同步更新还是异步更新。
 
@@ -324,3 +324,195 @@ function performSyncWorkOnRoot(root) {
   commitRoot(root);
 }
 ```
+
+
+**<span style="color:red">commit 阶段(Renderer)</span>**
+
+在次部分主要分为3个阶段
+
+- before mutation阶段（执行DOM操作前）
+- mutation阶段（执行DOM操作）
+- layout阶段（执行DOM操作后）
+
+
+
+1、before mutation阶段
+  - 遍历effectList，根据effectTag的不同，调用不同的处理函数处理Fiber。
+  - 执行一些hooks和声明周期函数。
+    - 调用getSnapshotBeforeUpdate生命周期函数
+    - 调度useEffect
+
+2、mutation阶段
+  - 遍历effectList，根据effectTag的不同，调用不同的处理函数处理Fiber。
+  - 执行一些hooks和声明周期函数。
+    - 上一次useLayoutEffect的销毁函数
+    - useEffect销毁函数
+    - componentWillUnmount
+    - useImperativeHandle
+
+
+3、layout阶段
+  - 遍历effectList，根据effectTag的不同，调用不同的处理函数处理Fiber。
+  - 执行一些hooks和声明周期函数。
+    - 调用componentDidMount
+    - 调用componentDidUpdate
+    - 调用useLayoutEffect回调函数
+    - 调用useEffect回调函数
+    - 上一次useEffect的销毁函数
+  - current Fiber树切换
+  - 更新ref
+
+
+
+### 状态更新
+
+在React中，有如下方法可以触发状态更新
+- ReactDOM.render
+- this.setState
+- this.forceUpdate
+- useState
+- useReducer
+
+```js
+触发状态更新（根据场景调用不同方法）
+
+    |
+    |
+    v
+
+创建Update对象（接下来三节详解）
+
+    |
+    |
+    v
+
+从fiber到root（`markUpdateLaneFromFiberToRoot`）
+
+    |
+    |
+    v
+
+调度更新（`ensureRootIsScheduled`）
+
+    |
+    |
+    v
+
+render阶段（`performSyncWorkOnRoot` 或 `performConcurrentWorkOnRoot`）
+
+    |
+    |
+    v
+
+commit阶段（`commitRoot`）
+```
+
+
+
+**update**
+
+在React中，每次触发状态更新，都会创建一个Update对象，用于存储更新的数据。
+
+ClassComponent与HostRoot（即rootFiber.tag对应类型）共用同一种Update结构。
+
+Fiber节点上的多个Update会组成链表并被包含在**fiber.updateQueue**中
+
+update结构：
+
+```ts
+const update: Update<*> = {
+  eventTime,
+  lane,
+  suspenseConfig,
+  tag: UpdateState,
+  payload: null,
+  callback: null,
+
+  next: null, // 单向链表的形式，指向下一个update
+};
+```
+
+updateQueue结构：
+
+```ts
+const updateQueue: UpdateQueue<State> = {
+  baseState: fiber.memoizedState,
+  firstBaseUpdate: null,
+  lastBaseUpdate: null,
+  shared: {
+    pending: null,
+  },
+  effects: null,
+};
+```
+
+---
+
+
+### Scheduler
+
+本质上是使用MessageChannel模拟实现浏览器的requestIdleCallback，用于调度任务的执行，在不支持requestIdleCallback的浏览器中，会使用setTimeout替代。
+
+不使用requestIdleCallback的原因，因为requestIdleCallback的回调函数执行时间不可控,依赖于显示器的刷新频率。requestAnimationFrame的回调函数执行时间也不可控。
+react团队更希望控制调度的频率，根据任务的优先级不同，提高任务的处理速度，放弃本身对于浏览器帧的依赖。
+
+
+
+所以使用了 Task 任务MessageChannel 模拟实现 requestIdleCallback。setTimeout即使设置为0，但是最小间隔时间仍为4ms。
+
+```js
+一个task(宏任务) -- 队列中全部job(微任务) -- requestAnimationFrame -- 浏览器重排/重绘 -- requestIdleCallback
+```
+
+**如何重启中断的任务**
+
+
+render阶段被调度的函数为**performConcurrentWorkOnRoot**，在该函数末尾有这样一段代码：
+
+```js
+ensureRootIsScheduled(root, now()); // 改变callbackNode
+if (root.callbackNode === originalCallbackNode) {
+  // 当 fiber 链表的 callbackNode 在执行时，并没有发生改变
+  // 则说明当前任务和之前是相同的任务，即上一次执行的任务还可以继续
+  // 便将其自身返回，用于 scheduler 中的 continuationCallback
+  return performConcurrentWorkOnRoot.bind(null, root);
+}
+```
+
+```js
+function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
+  // 在fiber树构建、更新完成后。nextLanes会赋值为NoLanes 此时会将callbackNode赋值为null, 表示此任务执行结束
+  // 如果此时有更高优先级的任务进来，会将callbackNode赋值为新的任务
+}
+```
+
+
+在Scheduler中，存在两个任务队列
+- timerQueue：保存未就绪任务
+- taskQueue：保存已就绪任务
+
+每当有新的未就绪的任务被注册，我们将其插入timerQueue并根据开始时间重新排列timerQueue中任务的顺序。
+
+当timerQueue中有任务就绪，即startTime <= currentTime，我们将其取出并加入taskQueue。
+
+取出taskQueue中最早过期的任务并执行他。
+
+
+在取出taskQueue中最早过期的任务并执行他时，这一步中有如下关键步骤：
+
+```js
+
+const continuationCallback = callback(didUserCallbackTimeout);
+currentTime = getCurrentTime();
+if (typeof continuationCallback === 'function') {
+  // 检查callback的执行结果返回的是不是函数，如果返回的是函数，则将这个函数作为当前任务新的回调。
+  currentTask.callback = continuationCallback;
+  markTaskYield(currentTask, currentTime);
+}
+// 判断currentTask不为null，返回true，则说明还有任务。继续port.postMessage(null)，继续执行任务。
+/* ----省略代码---- */
+if (currentTask !== null) return true;
+/* ----省略代码---- */
+
+```
+
