@@ -170,15 +170,14 @@ function beginWork(
 }
 ```
 
-- 首先会根据 current Fiber 是否存在，判断是初次渲染还是更新。如果是初次渲染，会调用 mount 方法，否则会调用 update 方法。
+- 首先会根据 current Fiber 是否存在，判断是初次渲染还是更新。
+  - current !== null，进入 update 阶段。
+    - 如果满足优化策略（根据 current 和 workInProgress 的 props、type相同）。不更新，就会直接跳过子节点的遍历，进入 completeWork 阶段。不满足则进入mount阶段。
 
-  - 更新，调用 update 方法
-
-    - 在 update 方法里面，还会根据 current Fiber 与 workInProgress Fiber 的 props 是否相同，判断是否需要更新。如果不需要更新，会直接跳过子节点的遍历，进入 completeWork 阶段。
-
-  - 初次更新/不满足优化策略，调用 mount 方法。
-    - 根据 workInProgress Fiber 的 type，进入不同的方法创建 子 Fiber 逻辑。对于我们常见的组件类型，如（FunctionComponent/ClassComponent/HostComponent），最终会进入 reconcileChildren 方法。
-      - mountChildFibers 和 reconcileChildFibers 的功能基本一致。区别是 reconcileChildFibers 会给创建的 fiber 节点打上 effectTag 标记，而 mountChildFibers 不会。
+  - current === null，或者不满足更新策略，会进入 mount 阶段。
+    - 进入reconcileChildren。
+      - 如果是mount，会创建子Fiber节点。
+      - 如果是update，会进入diff算法，找出需要更新的子Fiber节点。打上effectTag标记。
 
 **reconcileChildren**
 
@@ -199,6 +198,9 @@ export function reconcileChildren(
     );
   } else {
     // 对于update的组件（Diff算法）
+    /*
+      mountChildFibers 和 reconcileChildFibers 的功能基本一致。区别是 reconcileChildFibers 会给创建的   fiber 节点打上 effectTag 标记，而 mountChildFibers 不会。
+    */
     workInProgress.child = reconcileChildFibers(
       workInProgress,
       current.child,
@@ -316,7 +318,7 @@ rootFiber.firstEffect -----------> fiber -----------> fiber
 
 ### render结束
 
-至此，render阶段全部工作完成。在performSyncWorkOnRoot函数中fiberRootNode被传递给commitRoot方法，开启commit阶段工作流程。
+至此，render阶段全部工作完成。performSyncWorkOnRoot/performConcurrentWorkOnRoot最后把fiberRootNode传递给commitRoot方法，开启commit阶段工作流程。
 
 ```ts
 function performSyncWorkOnRoot(root) {
@@ -337,13 +339,14 @@ function performSyncWorkOnRoot(root) {
 
 
 1、before mutation阶段
-  - 遍历effectList，根据effectTag的不同，调用不同的处理函数处理Fiber。
+  - 遍历effectList，调用commitBeforeMutationEffects。
   - 执行一些hooks和声明周期函数。
     - 调用getSnapshotBeforeUpdate生命周期函数
     - 调度useEffect
 
 2、mutation阶段
   - 遍历effectList，根据effectTag的不同，调用不同的处理函数处理Fiber。
+    - 例如：插入DOM节点，更新DOM节点，删除DOM节点等。
   - 执行一些hooks和声明周期函数。
     - 上一次useLayoutEffect的销毁函数
     - useEffect销毁函数
@@ -386,13 +389,15 @@ function performSyncWorkOnRoot(root) {
     |
     v
 
-从fiber到root（`markUpdateLaneFromFiberToRoot`）
+从fiber到root（`调用markUpdateLaneFromFiberToRoot获取到rootFiber`）
 
     |
     |
     v
 
-调度更新（`ensureRootIsScheduled`）
+调度更新
+（`ensureRootIsScheduled，这里会触发scheduleUpdateOnFiber(调度update)，
+开启performSyncWorkOnRoot或performConcurrentWorkOnRoot`）
 
     |
     |
@@ -406,7 +411,6 @@ render阶段（`performSyncWorkOnRoot` 或 `performConcurrentWorkOnRoot`）
 
 commit阶段（`commitRoot`）
 ```
-
 
 
 **update**
@@ -445,6 +449,54 @@ const updateQueue: UpdateQueue<State> = {
   effects: null,
 };
 ```
+
+
+
+**ReactDOM.render**
+
+```js
+创建fiberRootNode、rootFiber、updateQueue（`legacyCreateRootFromDOMContainer`）
+
+    |
+    |
+    v
+
+创建Update对象（`updateContainer`）
+
+    |
+    |
+    v
+
+从fiber到root（`markUpdateLaneFromFiberToRoot`）
+
+    |
+    |
+    v
+
+调度更新（`ensureRootIsScheduled`）
+
+    |
+    |
+    v
+
+render阶段（`performSyncWorkOnRoot` 或 `performConcurrentWorkOnRoot`）
+
+    |
+    |
+    v
+
+commit阶段（`commitRoot`）
+```
+
+
+**this.setState**  
+
+- this.setState内部会调用enqueueUpdate方法，创建Update对象，将Update对象添加到fiber.updateQueue中。然后触发调度更新scheduleUpdateOnFiber。
+
+
+**this.forceUpdate**
+
+- this.forceUpdate内部会调用enqueueForceUpdate方法，创建Update对象，将Update对象添加到fiber.updateQueue中。然后触发调度更新scheduleUpdateOnFiber。（除了tag不同，以及payload为null，其他与this.setState相同）
 
 ---
 

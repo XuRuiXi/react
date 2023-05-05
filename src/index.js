@@ -11,16 +11,16 @@ import ReactDOM from 'react-dom';
 
 const A = ({ count }) => {
   React.useLayoutEffect(() => {
-    console.log('useLayoutEffect');
+    console.log('useLayoutEffect,AAAA');
     return () => {
-      console.log('useLayoutEffect,1111');
+      console.log('销毁useLayoutEffectt,AAAA');
     };
   }, []);
 
   React.useEffect(() => {
-    console.log('useEffect');
+    console.log('useEffect,AAAA');
     return () => {
-      console.log('useEffect,1111');
+      console.log('销毁useEffect,AAAA');
     };
   }, []);
 
@@ -31,9 +31,34 @@ const A = ({ count }) => {
   );
 };
 
+class B extends React.Component {
+  componentDidMount() {
+    console.log('componentDidMount,BBBB');
+  }
+
+  componentWillUnmount() {
+    console.log('componentWillUnmount,BBBB');
+  }
+
+  render() {
+    return (
+      <div>
+        classCop
+      </div>
+    );
+  }
+}
+
 const App = () => {
   const [count, setCount] = React.useState(1);
   const [count2, setCount2] = React.useState(2);
+
+  React.useLayoutEffect(() => {
+    console.log('useLayoutEffect');
+    return () => {
+      console.log('销毁useLayoutEffectt');
+    };
+  }, []);
 
   return (
     <div>
@@ -54,7 +79,12 @@ const App = () => {
         add
       </button>
       {
-        count % 2 === 0 ? <A count={count} /> : null
+        count % 2 === 0 ?
+          <>
+            <A count={count} />
+            <B />
+          </> :
+          <A count={count} />
       }
     </div>
   );
