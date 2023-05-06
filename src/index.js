@@ -40,6 +40,10 @@ class B extends React.Component {
     console.log('componentWillUnmount,BBBB');
   }
 
+  getNumber() {
+    console.log(1111111);
+  }
+
   render() {
     return (
       <div>
@@ -59,7 +63,7 @@ const App = () => {
       console.log('销毁useLayoutEffectt');
     };
   }, []);
-
+  console.log(B.prototype.getNumber());
   return (
     <div>
       <h1>hello {count}</h1>

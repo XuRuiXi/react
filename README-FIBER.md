@@ -523,6 +523,7 @@ render阶段被调度的函数为**performConcurrentWorkOnRoot**，在该函数�
 
 ```js
 ensureRootIsScheduled(root, now()); // 改变callbackNode
+
 if (root.callbackNode === originalCallbackNode) {
   // 当 fiber 链表的 callbackNode 在执行时，并没有发生改变
   // 则说明当前任务和之前是相同的任务，即上一次执行的任务还可以继续
@@ -553,7 +554,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
 在取出taskQueue中最早过期的任务并执行他时，这一步中有如下关键步骤：
 
 ```js
-
+// 这个continuationCallback就是上面提到的performConcurrentWorkOnRoot.bind(null, root)
 const continuationCallback = callback(didUserCallbackTimeout);
 currentTime = getCurrentTime();
 if (typeof continuationCallback === 'function') {
